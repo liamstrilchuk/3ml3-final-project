@@ -22,6 +22,25 @@
 
 \section{Data Acquisition and Preprocessing}
 
+Wikipedia provides a directory of all WikiProjects, along with details about their
+size.\footnote{See \url{https://en.wikipedia.org/wiki/Wikipedia:WikiProject_Directory/All}.}
+To simplify the model, we will classify only the 25 WikiProjects with the largest number
+of articles. Our first goal is to find a list of articles in each project; we can use
+Wikipedia's API for this. 
+
+A major problem that we have to deal with here is the relative sizes of each category.
+WikiProject Biography, for example, has nearly 2.2 million articles; while a smaller
+WikiProject Lepidoptera has only around 100,000. This difference would be even more
+pronounced if we were to classify more than 25 projects: the vast majority of projects
+have fewer than 10,000 articles. If we were to use all possible data to train our model,
+it would likely have a bias towards larger projects while potentially ignoring smaller
+ones.\footnote{O. Olawale Awe, ``Computational Strategies for Handling Imbalanced Data in
+Machine Learning''}
+
+To combat this, we use a technique called undersampling. While there are fairly complex
+algorithms that can be used for this purpose, we will use the simpler \textit{random
+undersampling}, which will result in a more balanced dataset.
+
 \section{Feature Engineering}
 
 \section{Model Implementation}
@@ -29,5 +48,7 @@
 \section{Evaluation and Insights}
 
 \section{Conclusion}
+
+\section{References}
 
 \end{document}
