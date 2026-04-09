@@ -20,7 +20,38 @@
 
 \section{Overview and Motivation}
 
+On Wikipedia, before articles are made visible to the public, they must go through a
+review process. Reviewers, who are volunteers, must follow a 30+ step flowchart for each
+published article;\footnote{See\url{https://upload.wikimedia.org/wikipedia/commons/f/f4/NPP_flowchart.svg}.}
+this time-consuming process, along with a shortage of reviewers, means
+there is often a months-long waiting time for articles to be reviewed (at the time of
+writing, the number of articles waiting to be reviewed is over 17,000). Therefore, any
+additional tools that could shorten the time taken to review an article would be incredibly
+beneficial to the Wikipedia community.
+
+For this project, we will create a model which can handle a step of this process. Articles
+can be classified into one or more \textit{WikiProjects}; a WikiProject is a group of editors
+focusing on a specific topic. For example, \href{https://en.wikipedia.org/wiki/Wikipedia:WikiProject_Canada}
+{WikiProject Canada} is a group of (mainly Canadian) editors improving Canada-related articles.
+Classifying articles into projects is extremely important, since it allows them to be targeted
+for improvement by editors knowledgeable about the subject area; unclassified articles are
+often neglected. However, since classifying is considered an ``optional'' step in the
+reviewing process, many articles end up unclassified.
+
+To this end, we will create a model to solve this multi-label classification problem. This
+is different from multi-class classification, since an article can be part of zero, one, or
+more WikiProjects. Since there are thousands of projects of varying size (for example,
+\textit{Computing} has 36,000 articles; \textit{Artificial intelligence} has 1,600; and
+\textit{Human-computer interaction} has only 184), we will focus on classifying only the
+approximately 100 largest projects.
+
 \section{Data Acquisition and Preprocessing}
+
+To train our model, we need data in the format $(lead, projects)$, where the $lead$ is the
+beginning article text, and $projects$ is a list containing the WikiProjects that article
+has been assigned. While there is no existing dataset containing the exact data we need
+for this model, Wikipedia is very open and provides a number of APIs which we can use to
+collect the data ourselves.
 
 Wikipedia provides a directory of all WikiProjects, along with details about their
 size.\footnote{See \url{https://en.wikipedia.org/wiki/Wikipedia:WikiProject_Directory/All}.}

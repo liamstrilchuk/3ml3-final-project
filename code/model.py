@@ -4,12 +4,15 @@ import pandas as pd
 import csv
 import os
 
+os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
+
 from tensorflow.keras.models import load_model # type: ignore
 from tensorflow.keras.models import Sequential # type: ignore
 from tensorflow.keras.layers import Dense, Dropout # type: ignore
 from sklearn.preprocessing import MultiLabelBinarizer
 from sklearn.model_selection import train_test_split
 from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.metrics import classification_report
 
 class Model():
 	def __init__(self):
@@ -54,15 +57,15 @@ class Model():
 		)
 
 		self.initialized = True
-		return self.model.summary()
+		return self
 
-	def train(self, epochs=5):
+	def train(self, epochs=5, validation_split=0.1):
 		history = self.model.fit(
 			self.X_train,
 			self.y_train,
 			epochs=epochs,
 			batch_size=32,
-			validation_split=0.1
+			validation_split=validation_split
 		)
 
 		return history
@@ -90,6 +93,18 @@ class Model():
 
 		return data
 
+	def get_report(self, threshold=0.5, output_dict=False):
+		y_pred_probs = self.model.predict(self.X_test)
+		y_pred = (y_pred_probs >= threshold).astype(int)
+
+		return classification_report(
+			self.y_test,
+			y_pred,
+			target_names=self.mlb.classes_,
+			zero_division=0,
+			output_dict=output_dict
+		)
+
 	def save(self, name):
 		if not self.initialized:
 			raise RuntimeError("Model is not initialized")
@@ -98,6 +113,7 @@ class Model():
 		self.model.save(f"../model/{name}/wiki_model.keras")
 		joblib.dump(self.vectorizer, f"../model/{name}/tfidf_vectorizer.pkl")
 		joblib.dump(self.mlb, f"../model/{name}/mlb_binarizer.pkl")
+		joblib.dump([self.X_test, self.y_test], f"../model/{name}/test_data.pkl")
 
 	def load(self, name):
 		if self.initialized:
@@ -106,6 +122,7 @@ class Model():
 		self.model = load_model(f"../model/{name}/wiki_model.keras")
 		self.vectorizer = joblib.load(f"../model/{name}/tfidf_vectorizer.pkl")
 		self.mlb = joblib.load(f"../model/{name}/mlb_binarizer.pkl")
+		self.X_test, self.y_test = joblib.load(f"../model/{name}/test_data.pkl")
 		self.initialized = True
 
 		return self
