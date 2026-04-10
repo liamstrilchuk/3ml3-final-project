@@ -8,6 +8,14 @@
 \usepackage{csquotes}
 \usepackage{latexsym}
 \usepackage[left=1in, right=1in, top=1in, bottom=1in]{geometry}
+\usepackage{pgfplots}
+\usepgfplotslibrary{units}
+\pgfplotsset{
+    compat=1.18,
+    table/search path={../data},
+    table/col sep=comma
+}
+\newcommand*{\code}[1]{\texttt{\detokenize{#1}}}
 \begin{document}
 
 \title{DATASCI 3ML3 Final Project\\{\Large{Wikipedia Article Classification}}}
@@ -72,7 +80,7 @@ To combat this, we use a technique called undersampling. While there are fairly 
 algorithms that can be used for this purpose, we will use the simpler \textit{random
 undersampling}, which will result in a more balanced dataset. The way this works in practice
 is by training on only a portion of the available dataset for majority classes. So, we
-will obtain only a random subset of articles in each project: approximately 5,000 from each.
+will obtain only a random subset of articles in each project: approximately 2,000 from each.
 This is likely far more than needed to train an effective model; in the Evaluation section
 below, we will explore training models with varying amounts of available data.
 
@@ -83,6 +91,73 @@ below, we will explore training models with varying amounts of available data.
 \section{Evaluation and Insights}
 
 \subsection{Experiment: Data Volume}
+
+Since our model is classifying no more than the 100 largest WikiProjects, all of which have
+at least 20,000 articles, our model is not suffering from a lack of training data. However,
+should the model be expanded in the future to much smaller projects, some of which have only
+hundreds of examples, this could become a problem. Therefore it would be beneficial to determine
+how much data is needed to make accurate predictions.
+
+Figure \ref{fig:metrics_vs_split} shows the results of the experiment. The chart shows the
+classification metrics (Precision, Recall, and F1-Score) graphed against the portion of the
+dataset used for training: between 1\% and 90\%. To ensure a fair comparison between these
+radically different dataset sizes, instead of artificially constraining the number of epochs,
+the Keras callback \code{EarlyStopping} was used to stop training when the validation accuracy
+decreased. This ensures that models with less data do not overfit due to their limited sample size.
+
+\begin{figure}[H]
+    \centering
+    \begin{tikzpicture}
+        \begin{axis}[
+            width=12cm,
+            height=8cm,
+            title={Performance Metrics vs. Data Split},
+            xlabel={Portion of Dataset Used},
+            ylabel={Score},
+            xmin=0, xmax=0.9,
+            ymin=0, ymax=1.0,
+            xtick={0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9},
+            ytick={0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0},
+            legend pos=south east,
+            grid=major,
+            grid style={dashed, gray!30},
+            every axis plot/.append style={thick}
+        ]
+        \addplot[
+            color=blue,
+            mark=*,
+            mark size=1.5pt
+        ]
+        table [x=split, y=precision, col sep=comma] {experiment_data_split.csv};
+        \addlegendentry{Precision}
+        \addplot[
+            color=red,
+            mark=square*,
+            mark size=1.5pt
+        ]
+        table [x=split, y=recall, col sep=comma] {experiment_data_split.csv};
+        \addlegendentry{Recall}
+        \addplot[
+            color=green!60!black,
+            mark=triangle*,
+            mark size=2pt
+        ]
+        table [x=split, y=f1-score, col sep=comma] {experiment_data_split.csv};
+        \addlegendentry{F1-Score}
+        \end{axis}
+    \end{tikzpicture}
+    \caption{Precision, Recall, and F1-score evaluated across different data splits.}
+    \label{fig:metrics_vs_split}
+\end{figure}
+
+While the model's performance when using less than 10\% of the dataset is extremely poor,
+the accuracy begins to level out around 20\%, and by 50\% we experience diminishing returns
+and any improvement becomes very marginal. While increasing the amount of data used does
+result in an improvement, even if small, it comes at a cost: the training time increases
+significantly when more data is used. For example, when all available data was used to train
+a model, the training time was roughly 3x that of a model using only 30\%; however, the
+improvement in accuracy was only 2\%. Thus it may not be worth it to always use the
+largest possible dataset.
 
 \section{Conclusion}
 

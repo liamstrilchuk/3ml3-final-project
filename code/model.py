@@ -3,6 +3,7 @@ import numpy as np
 import pandas as pd
 import csv
 import os
+import time
 
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 
@@ -19,11 +20,13 @@ class Model():
 	def __init__(self):
 		self.initialized = False
 
-	def create(self, params={}):
+	def create(self, drop_data=0, dropout=0.3):
 		if self.initialized:
 			raise RuntimeError("Model is already initialized")
 
 		data = self.get_data()
+		data = data.drop(data.sample(frac=drop_data).index)
+		
 		self.mlb = MultiLabelBinarizer()
 		y = self.mlb.fit_transform(data["wikiprojects"])
 
@@ -43,7 +46,6 @@ class Model():
 
 		self.model = Sequential()
 
-		dropout = params["dropout"] if "dropout" in params else 0.3
 		self.model.add(Dense(512, input_dim=self.X_train.shape[1], activation="relu"))
 		self.model.add(Dropout(dropout))
 
@@ -68,6 +70,7 @@ class Model():
 			restore_best_weights=True
 		)] if stop_early else []
 
+		start = time.time()
 		history = self.model.fit(
 			self.X_train,
 			self.y_train,
@@ -76,8 +79,9 @@ class Model():
 			validation_split=validation_split,
 			callbacks=callbacks
 		)
+		time_taken = time.time() - start
 
-		return history
+		return history, time_taken
 
 	def get_data(self):
 		data = pd.read_csv("../data/all_data.csv")
