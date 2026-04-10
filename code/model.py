@@ -6,6 +6,7 @@ import os
 
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 
+from tensorflow.keras.callbacks import EarlyStopping # type: ignore
 from tensorflow.keras.models import load_model # type: ignore
 from tensorflow.keras.models import Sequential # type: ignore
 from tensorflow.keras.layers import Dense, Dropout # type: ignore
@@ -42,11 +43,12 @@ class Model():
 
 		self.model = Sequential()
 
+		dropout = params["dropout"] if "dropout" in params else 0.3
 		self.model.add(Dense(512, input_dim=self.X_train.shape[1], activation="relu"))
-		self.model.add(Dropout(0.3))
+		self.model.add(Dropout(dropout))
 
 		self.model.add(Dense(256, activation="relu"))
-		self.model.add(Dropout(0.3))
+		self.model.add(Dropout(dropout))
 
 		self.model.add(Dense(y.shape[1], activation="sigmoid"))
 
@@ -59,13 +61,20 @@ class Model():
 		self.initialized = True
 		return self
 
-	def train(self, epochs=5, validation_split=0.1):
+	def train(self, stop_early=True, epochs=10, validation_split=0.1):
+		callbacks = [EarlyStopping(
+			monitor="val_loss",
+			patience=2,
+			restore_best_weights=True
+		)] if stop_early else []
+
 		history = self.model.fit(
 			self.X_train,
 			self.y_train,
 			epochs=epochs,
 			batch_size=32,
-			validation_split=validation_split
+			validation_split=validation_split,
+			callbacks=callbacks
 		)
 
 		return history

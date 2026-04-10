@@ -57,7 +57,7 @@ Wikipedia provides a directory of all WikiProjects, along with details about the
 size.\footnote{See \url{https://en.wikipedia.org/wiki/Wikipedia:WikiProject_Directory/All}.}
 To simplify the model, we will classify only the 25 WikiProjects with the largest number
 of articles. Our first goal is to find a list of articles in each project; we can use
-Wikipedia's API for this. 
+the \href{https://api.wp1.openzim.org}{WP 1.0 API} for this.
 
 A major problem that we have to deal with here is the relative sizes of each category.
 WikiProject Biography, for example, has nearly 2.2 million articles; while a smaller
@@ -70,7 +70,11 @@ Machine Learning''}
 
 To combat this, we use a technique called undersampling. While there are fairly complex
 algorithms that can be used for this purpose, we will use the simpler \textit{random
-undersampling}, which will result in a more balanced dataset.
+undersampling}, which will result in a more balanced dataset. The way this works in practice
+is by training on only a portion of the available dataset for majority classes. So, we
+will obtain only a random subset of articles in each project: approximately 5,000 from each.
+This is likely far more than needed to train an effective model; in the Evaluation section
+below, we will explore training models with varying amounts of available data.
 
 \section{Feature Engineering}
 
@@ -78,7 +82,17 @@ undersampling}, which will result in a more balanced dataset.
 
 \section{Evaluation and Insights}
 
+\subsection{Experiment: Data Volume}
+
 \section{Conclusion}
+
+\subsection{Next Steps}
+
+\begin{itemize}
+	\item Partial random under-sampling\footnote
+	{Nicolás García-Pedrajas, ``Partial random under/oversampling for multilabel problems''}
+	\item Pretrained models or word embeddings
+\end{itemize}
 
 \section{Code Organization}
 
