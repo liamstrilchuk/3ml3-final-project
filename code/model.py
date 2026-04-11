@@ -20,7 +20,7 @@ class Model():
 	def __init__(self):
 		self.initialized = False
 
-	def create(self, drop_data=0, dropout=0.3, max_features=10000):
+	def create(self, drop_data=0, dropout=0.3, max_features=10000, layer_size_factor=1):
 		if self.initialized:
 			raise RuntimeError("Model is already initialized")
 
@@ -46,10 +46,10 @@ class Model():
 
 		self.model = Sequential()
 
-		self.model.add(Dense(512, input_dim=self.X_train.shape[1], activation="relu"))
+		self.model.add(Dense(int(512 * layer_size_factor), input_dim=self.X_train.shape[1], activation="relu"))
 		self.model.add(Dropout(dropout))
 
-		self.model.add(Dense(256, activation="relu"))
+		self.model.add(Dense(int(256 * layer_size_factor), activation="relu"))
 		self.model.add(Dropout(dropout))
 
 		self.model.add(Dense(y.shape[1], activation="sigmoid"))

@@ -310,7 +310,26 @@ the process. This experiment uses models that have low, medium, and high levels 
     \label{fig:dropout_loss}
 \end{figure}
 
+Figure \ref{fig:dropout_loss} shows the results of the experiment. As expected, the model
+with no dropout has its training loss quickly drop to near zero while its validation loss
+steadily rises, indicating overfitting. While the medium and high dropout rates smooth
+this curve and delay the divergence, they fail to prevent the validation loss from
+increasing. All models achieve their absolute lowest validation loss very early, around
+epoch 2-3, showing the importance of the early stopping technique. Since even a high level
+of dropout fails to prevent overfitting, this suggests that the model possesses excess
+capacity, and reducing the size of the network's layers may be more effective at preventing
+overfitting.
+
 \subsection{Experiment: Max Features}
+
+The \code{max_features} parameter of the \code{TfidfVectorizer} class was discussed in
+Section 3. Optimizing its value can significantly impact both the training time and
+performance of a model. Too low, and the model does not have enough data to accurately
+classify text; too high, and the memory usage and training time increase, and we risk
+providing the model with thousands of ``filler'' words which do not matter for classification.
+
+This experiment tests the performance metrics of models based on the maximum number
+of features. Figure \ref{fig:metrics_vs_max_features} below shows the results.
 
 \begin{figure}[H]
     \centering
@@ -322,7 +341,7 @@ the process. This experiment uses models that have low, medium, and high levels 
             xlabel={Max Features},
             ylabel={Score},
             ymin=0.4, ymax=1.0,
-            xmin=50, xmax=15000,
+            xmin=50, xmax=30000,
             xtick={50, 100, 500, 1000, 5000, 10000}, 
             log ticks with fixed point,
             grid=major,
@@ -350,9 +369,74 @@ the process. This experiment uses models that have low, medium, and high levels 
         \addlegendentry{F1-Score}
         \end{semilogxaxis}
     \end{tikzpicture}
-    \caption{Performance metrics evaluated across an increasing count of max features (logarithmic scale).}
+    \caption{Performance metrics evaluated across a count of max features (logarithmic scale).}
     \label{fig:metrics_vs_max_features}
 \end{figure}
+
+Even 100 features is enough to achieve a reasonable degree of accuracy. The increase in model
+performance becomes marginal once the number of features reaches 1,000; after 10,000, there is
+no improvement whatsoever. This is likely because Wikipedia articles, despite covering a vast
+number of topics, can be categorized using a relatively small vocabulary: the words ``album''
+or ``Canadian'' can tell us, for example, that an article should be put into the ``Albums''
+or ``Canada'' WikiProjects respectively, without a large amount of other context needed.
+
+\subsection{Experiment: Model Size}
+
+Finally, we will run an experiment comparing models with different sizes of hidden layers.
+We measure the layer size as a factor of our arbitrarily picked initial values of 512 and 256
+for the first and second layers respectively. The more neurons a network has, the more capacity
+it has for learning complex patterns; however, this comes at the cost of increased memory
+usage, training time, and potential for overfitting. For example, a network with dense layers
+of sizes 1,024 and 512 has 524,288 trainable parameters between them; if the sizes are reduced
+by a factor of 8 to 128 and 64, this lowers to only 8,192.
+
+\begin{figure}[H]
+    \centering
+    \begin{tikzpicture}
+        \begin{axis}[
+            width=12cm,
+            height=8cm,
+            title={Performance Metrics vs. Size Factor},
+            xlabel={Size Factor},
+            ylabel={Score},
+            xmin=0, xmax=1.4,
+            ymin=0, ymax=1.0,
+            xtick={0.25, 0.50, 0.75, 1.00, 1.25},
+            ytick={0, 0.25, 0.50, 0.75, 1.00},
+            grid=major,
+            grid style={dashed, gray!30},
+            legend pos=outer north east,
+            every axis plot/.append style={thick}
+        ]
+        \addplot[
+            color=blue,
+            mark=none
+        ]
+        table [x=factor, y=precision, col sep=comma] {experiment_model_size.csv};
+        \addlegendentry{precision}
+        \addplot[
+            color=red,
+            mark=none
+        ]
+        table [x=factor, y=recall, col sep=comma] {experiment_model_size.csv};
+        \addlegendentry{recall}
+        \addplot[
+            color=green!70!black,
+            mark=none
+        ]
+        table [x=factor, y=f1-score, col sep=comma] {experiment_model_size.csv};
+        \addlegendentry{f1-score}
+        \end{axis}
+    \end{tikzpicture}
+    \caption{Performance metrics evaluated across different model size factors.}
+    \label{fig:metrics_vs_factor}
+\end{figure}
+
+Figure \ref{fig:metrics_vs_factor} shows the results of this experiment. We can see that
+our initial estimation of 512/256 was significantly more than needed. The performance metrics
+increase sharply until a factor of 0.15, at which point they even out and remain constant
+thereafter. Scaling the model any more than 0.25 is waste of resources, as it does not
+provide any performance gains.
 
 \section{Conclusion}
 
