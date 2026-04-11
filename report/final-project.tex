@@ -9,6 +9,7 @@
 \usepackage{latexsym}
 \usepackage[left=1in, right=1in, top=1in, bottom=1in]{geometry}
 \usepackage{pgfplots}
+\usepackage{pgfplotstable}
 \usepackage{listings}
 \usepackage{xcolor}
 
@@ -151,6 +152,26 @@ being $\log{\frac{100}{96}}\approx 0.02$, or an extremely low ``importance''. Ho
 consider the word ``Canadian'', which only appears in 4\% of leads, its IDF would be $\log
 {\frac{100}{4}}\approx 1.4$.
 
+For our model, we will use the \code{scikit-learn} library's \code{TfidfVectorizer} class.
+This has a number of parameters to improve the algorithm's accuracy and performance:
+
+\begin{itemize}
+	\item \code{max_features} limits the number of terms, selecting only the top $N$ features
+	by their term frequency. Setting this limit reduces the dimensionality of the data, which
+	can reduce memory usage and prevent overfitting by excluding rare words.
+	\item \code{stop_words} excludes common English words which do not provide a significant
+	amount of information, helping the model focus on more important terms. This can also have
+	the benefit of reducing the number of features and thus improving performance.
+	\item \code{ngram_range} is a tuple $(min, max)$ that tells the vectorizer how many tokens
+	in a row to consider as a single term. For example, with the input ``New York City'', the
+	range $(1, 1)$ would produce \code{["New", "York", "City"]}, whereas $(1, 3)$ would also
+	consider \code{"New York"} and \code{"New York City"}, allowing for more semantic context.
+	However, this comes at the cost of a significantly higher number of features.
+\end{itemize}
+
+Importantly, when fitting the vectorizer to the data, we use only the training data, and not
+any test data, to ensure there is no data leakage.
+
 \section{Model Implementation}
 
 \section{Evaluation and Insights}
@@ -177,35 +198,32 @@ decreased. This ensures that models with less data do not overfit due to their l
             width=12cm,
             height=8cm,
             title={Performance Metrics vs. Data Split},
-            xlabel={Portion of Dataset Used},
+            xlabel={Split},
             ylabel={Score},
             xmin=0, xmax=0.9,
             ymin=0, ymax=1.0,
             xtick={0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9},
             ytick={0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0},
-            legend pos=south east,
             grid=major,
             grid style={dashed, gray!30},
+            legend pos=outer north east,
             every axis plot/.append style={thick}
         ]
         \addplot[
             color=blue,
-            mark=*,
-            mark size=1.5pt
+            mark=none
         ]
         table [x=split, y=precision, col sep=comma] {experiment_data_split.csv};
         \addlegendentry{Precision}
         \addplot[
             color=red,
-            mark=square*,
-            mark size=1.5pt
+            mark=none
         ]
         table [x=split, y=recall, col sep=comma] {experiment_data_split.csv};
         \addlegendentry{Recall}
         \addplot[
-            color=green!60!black,
-            mark=triangle*,
-            mark size=2pt
+            color=green!70!black,
+            mark=none
         ]
         table [x=split, y=f1-score, col sep=comma] {experiment_data_split.csv};
         \addlegendentry{F1-Score}
@@ -223,6 +241,118 @@ significantly when more data is used. For example, when all available data was u
 a model, the training time was roughly 3x that of a model using only 30\%; however, the
 improvement in accuracy was only 2\%. Thus it may not be worth it to always use the
 largest possible dataset.
+
+\subsection{Experiment: Dropout}
+
+Dropout is a regularization technique used in neural networks to prevent overfitting. It
+entails deactivating a random portion of neurons when training, forcing the network to learn
+robust patterns instead of memorizing the training data. In this experiment, we train models
+with different levels of dropout and examine their training and validation loss throughout
+the process. This experiment uses models that have low, medium, and high levels of dropout
+(0.0, 0.3, and 0.6 respectively).
+
+\begin{figure}[H]
+    \centering
+    \begin{tikzpicture}
+        \begin{axis}[
+            width=12cm,
+            height=8cm,
+            title={Model Loss (Training vs. Validation)},
+            xlabel={Epoch},
+            ylabel={Loss},
+            xmin=1, xmax=15,
+            ymin=0, ymax=0.2,
+            xtick={2, 4, 6, 8, 10, 12, 14},
+            grid=major,
+            grid style={dashed, gray!30},
+            legend pos=outer north east,
+            every axis plot/.append style={thick}
+        ]
+        \addplot[
+            color=blue,
+            mark=none
+        ]
+        table [x=epoch, y=low_loss, col sep=comma] {experiment_dropout.csv};
+        \addlegendentry{Loss (low)}
+        \addplot[
+            color=red,
+            mark=none
+        ]
+        table [x=epoch, y=low_val_loss, col sep=comma] {experiment_dropout.csv};
+        \addlegendentry{Val Loss (low)}
+        \addplot[
+            color=yellow!80!black, 
+            mark=none
+        ]
+        table [x=epoch, y=med_loss, col sep=comma] {experiment_dropout.csv};
+        \addlegendentry{Loss (med)}
+        \addplot[
+            color=green!70!black,
+            mark=none
+        ]
+        table [x=epoch, y=med_val_loss, col sep=comma] {experiment_dropout.csv};
+        \addlegendentry{Val Loss (med)}
+        \addplot[
+            color=orange,
+            mark=none
+        ]
+        table [x=epoch, y=high_loss, col sep=comma] {experiment_dropout.csv};
+        \addlegendentry{Loss (high)}
+        \addplot[
+            color=cyan!80!black,
+            mark=none
+        ]
+        table [x=epoch, y=high_val_loss, col sep=comma] {experiment_dropout.csv};
+        \addlegendentry{Val Loss (high)}
+        \end{axis}
+    \end{tikzpicture}
+    \caption{Training and validation loss across epochs for different dropout rates.}
+    \label{fig:dropout_loss}
+\end{figure}
+
+\subsection{Experiment: Max Features}
+
+\begin{figure}[H]
+    \centering
+    \begin{tikzpicture}
+        \begin{semilogxaxis}[
+            width=12cm,
+            height=8cm,
+            title={Performance Metrics vs. Max Features},
+            xlabel={Max Features},
+            ylabel={Score},
+            ymin=0.4, ymax=1.0,
+            xmin=50, xmax=15000,
+            xtick={50, 100, 500, 1000, 5000, 10000}, 
+            log ticks with fixed point,
+            grid=major,
+            grid style={dashed, gray!30},
+            legend pos=outer north east,
+            every axis plot/.append style={thick}
+        ]
+        \addplot[
+            color=blue,
+            mark=none
+        ]
+        table [x=count, y=precision, col sep=comma] {experiment_max_features.csv};
+        \addlegendentry{Precision}
+        \addplot[
+            color=red,
+            mark=none
+        ]
+        table [x=count, y=recall, col sep=comma] {experiment_max_features.csv};
+        \addlegendentry{Recall}
+        \addplot[
+            color=green!70!black,
+            mark=none
+        ]
+        table [x=count, y=f1-score, col sep=comma] {experiment_max_features.csv};
+        \addlegendentry{F1-Score}
+        \end{semilogxaxis}
+    \end{tikzpicture}
+    \caption{Performance metrics evaluated across an increasing count of max features (logarithmic scale).}
+    \label{fig:metrics_vs_max_features}
+\end{figure}
 
 \section{Conclusion}
 

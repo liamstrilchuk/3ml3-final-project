@@ -20,7 +20,7 @@ class Model():
 	def __init__(self):
 		self.initialized = False
 
-	def create(self, drop_data=0, dropout=0.3):
+	def create(self, drop_data=0, dropout=0.3, max_features=10000):
 		if self.initialized:
 			raise RuntimeError("Model is already initialized")
 
@@ -35,7 +35,7 @@ class Model():
 		)
 
 		self.vectorizer = TfidfVectorizer(
-			max_features=10000,
+			max_features=max_features,
 			stop_words="english",
 			ngram_range=(1, 2),
 			min_df=5
