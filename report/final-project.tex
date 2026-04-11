@@ -9,6 +9,16 @@
 \usepackage{latexsym}
 \usepackage[left=1in, right=1in, top=1in, bottom=1in]{geometry}
 \usepackage{pgfplots}
+\usepackage{listings}
+\usepackage{xcolor}
+
+\lstset{
+    basicstyle=\small\ttfamily,
+    frame=single,
+    rulecolor=\color{gray!30},
+    backgroundcolor=\color{gray!5}
+}
+
 \usepgfplotslibrary{units}
 \pgfplotsset{
     compat=1.18,
@@ -51,7 +61,13 @@ is different from multi-class classification, since an article can be part of ze
 more WikiProjects. Since there are thousands of projects of varying size (for example,
 \textit{Computing} has 36,000 articles; \textit{Artificial intelligence} has 1,600; and
 \textit{Human-computer interaction} has only 184), we will focus on classifying only the
-approximately 100 largest projects.
+approximately 100 largest projects as a proof-of-concept. However, we will explore next
+steps for a full model in the conclusion.
+
+We will use Tensorflow/Keras to build and train the model, along with \code{scikit-learn}
+for its natural language processing features (specifically, TF-IDF). In the remainder of this
+report, we will discuss data acquisition and processing, creating a model, evaluation and
+experimentation; finally, we will create an improved model based on these insights.
 
 \section{Data Acquisition and Preprocessing}
 
@@ -59,7 +75,9 @@ To train our model, we need data in the format $(lead, projects)$, where the $le
 beginning article text, and $projects$ is a list containing the WikiProjects that article
 has been assigned. While there is no existing dataset containing the exact data we need
 for this model, Wikipedia is very open and provides a number of APIs which we can use to
-collect the data ourselves.
+collect the data ourselves. We will collect only the lead paragraphs of an article, instead
+of its full content, as its projects can be determined from the first paragraph alone in
+the vast majority of cases.
 
 Wikipedia provides a directory of all WikiProjects, along with details about their
 size.\footnote{See \url{https://en.wikipedia.org/wiki/Wikipedia:WikiProject_Directory/All}.}
@@ -84,7 +102,54 @@ will obtain only a random subset of articles in each project: approximately 2,00
 This is likely far more than needed to train an effective model; in the Evaluation section
 below, we will explore training models with varying amounts of available data.
 
+After finding a list of the articles from each project, we will use Wikipedia's
+\href{https://www.mediawiki.org/wiki/Extension:TextExtracts}{\code{extracts} API} to fetch
+the lead section for each. Finally, since an article can be part of more than one project,
+we go through each article and determine its other projects. Unfortunately, Wikipedia does
+not provide a convenient API for this purpose; so instead, we use regular expressions to
+parse the markup code for each article. We then save all of our collected data to
+\code{all_data.csv}. An example row in this dataset is the following:
+
+\begin{lstlisting}
+Treaty of London (1867),"The Treaty of London (French: Traite de Londres), often
+called the Second Treaty of London after the 1839 Treaty, granted Luxembourg full
+independence...",WikiProject London|WikiProject Luxembourg|...
+\end{lstlisting}
+
 \section{Feature Engineering}
+
+At the core of our model is the TF-IDF (term frequency-inverse document frequency) algorithm.
+Unlike the simpler bag-of-words model, which only captures the frequency of a term over a
+dataset, TF-IDF measures the relative importance of each term. We define $f_{t,d}$ as the number
+of times term $t$ occurs in document $d$; we then define the \textit{term frequency} as
+
+\begin{equation*}
+	\text{TF}(t, d) = \frac{f_{t,d}}{\sum_{t'\in d}f_{t',d}}
+\end{equation*}
+
+Or, in simpler terms, TF represents the fraction of words that are $t$ in $d$. The other metric
+we need to consider is \textit{inverse document frequency}. Let $D$ be the set of all documents
+in our dataset:
+
+\begin{equation*}
+	\text{IDF}(t, D) = \log{\frac{|D|}{|\{d\in D : t\in d\}|}}
+\end{equation*}
+
+This measures the relative rarity of words across the dataset: higher values means the term
+occurs in fewer documents. A logarithm is used because without it, a word that appears once
+in a million documents would have an IDF score of 1,000,000, resulting in the algorithm weighing
+it much higher than it should. We then multiply the TF and IDF values together to get the
+final result:
+
+\begin{equation*}
+	\text{TF-IDF}(t, d, D) = \text{TF}(t, d)\times \text{IDF}(t, D)
+\end{equation*}
+
+For example, consider the word ``the''. As one of the most commonly used words in English, it
+appears in approximately 96\% of the leads in our dataset; this would result in its IDF score
+being $\log{\frac{100}{96}}\approx 0.02$, or an extremely low ``importance''. However, if we
+consider the word ``Canadian'', which only appears in 4\% of leads, its IDF would be $\log
+{\frac{100}{4}}\approx 1.4$.
 
 \section{Model Implementation}
 
@@ -167,9 +232,32 @@ largest possible dataset.
 	\item Partial random under-sampling\footnote
 	{Nicolás García-Pedrajas, ``Partial random under/oversampling for multilabel problems''}
 	\item Pretrained models or word embeddings
+	\item Categories instead of projects
 \end{itemize}
 
 \section{Code Organization}
+
+The code for this project is split between Python modules and Jupyter notebooks: testing,
+experiment, and data collection code is in notebooks, while the modularized \code{Model}
+class is in a Python file. The description for each file is as follows:
+
+\begin{itemize}
+	\item \code{data_collection.ipynb} uses the steps described in Section 2 to collect data:
+	it uses Wikipedia's API to collect articles in each project, find the lead text for each,
+	find other WikiProjects for each article, and then saves the result to \code{all_data.csv}.
+	\item \code{create_model.ipynb} walks through the steps for creating a model: using a
+	binarizer to turn WikiProjects into vectors, splitting test and training data, vectorizing
+	the text, and creating, training, and saving the model.
+	\item \code{model.py} generalizes the code from this notebook to make a modular interface
+	with a \code{Model} class. This allows us to pass in additional parameters to run
+	experiments: dataset size, training duration, dropout, etc. It also provides \code{save},
+	\code{load}, and \code{get_report} functions, so we can easily tell how a model is
+	performing, or load a previously trained model.
+	\item \code{evaluation.ipynb} contains a function, \code{run_eval_thread}, which uses the
+	\text{Model} class to create and train a model with the given parameters. It does this on
+	a separate thread, to ensure memory is reclaimed once it is done. It then runs the model's
+	\code{get_report} function, and returns statistics.
+\end{itemize}
 
 \section{References}
 
