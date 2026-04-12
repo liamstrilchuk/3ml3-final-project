@@ -14,7 +14,7 @@ from tensorflow.keras.layers import Dense, Dropout # type: ignore
 from sklearn.preprocessing import MultiLabelBinarizer
 from sklearn.model_selection import train_test_split
 from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.metrics import classification_report
+from sklearn.metrics import classification_report, fbeta_score
 
 class Model():
 	def __init__(self):
@@ -30,7 +30,7 @@ class Model():
 		self.mlb = MultiLabelBinarizer()
 		y = self.mlb.fit_transform(data["wikiprojects"])
 
-		X_train_text, X_test_text, self.y_train, self.y_test = train_test_split(
+		self.X_train_text, self.X_test_text, self.y_train, self.y_test = train_test_split(
 			data["lead"], y, test_size=0.2, random_state=12
 		)
 
@@ -41,8 +41,8 @@ class Model():
 			min_df=5
 		)
 
-		self.X_train = self.vectorizer.fit_transform(X_train_text).toarray()
-		self.X_test = self.vectorizer.transform(X_test_text).toarray()
+		self.X_train = self.vectorizer.fit_transform(self.X_train_text).toarray()
+		self.X_test = self.vectorizer.transform(self.X_test_text).toarray()
 
 		self.model = Sequential()
 
@@ -59,6 +59,8 @@ class Model():
 			loss="binary_crossentropy",
 			metrics=["accuracy"]
 		)
+
+		self.X_test_text = self.X_test_text.tolist()
 
 		self.initialized = True
 		return self
@@ -108,6 +110,7 @@ class Model():
 
 	def get_report(self, threshold=0.5, output_dict=False):
 		y_pred_probs = self.model.predict(self.X_test)
+		threshold = getattr(self, "optimized_thresholds", threshold)
 		y_pred = (y_pred_probs >= threshold).astype(int)
 
 		return classification_report(
@@ -118,6 +121,65 @@ class Model():
 			output_dict=output_dict
 		)
 
+	def wrong_where(self, project, threshold=0.5, num_samples=5):
+		if not self.initialized:
+			raise RuntimeError("Model is not initialized")
+		
+		if not project in self.mlb.classes_:
+			raise ValueError("Project not found in classes")
+		
+		idx = list(self.mlb.classes_).index(project)
+
+		y_pred_probs = self.model.predict(self.X_test, verbose=0)
+		threshold = getattr(self, "optimized_thresholds", threshold)
+		y_pred = (y_pred_probs >= threshold).astype(int)
+
+		wrong_indices = np.where(y_pred[:, idx] != self.y_test[:, idx])[0]
+		np.random.shuffle(wrong_indices)
+		wrong_indices = wrong_indices[:num_samples]
+
+		results = []
+		for sidx in wrong_indices:
+			actual_projects = self.mlb.inverse_transform(np.array([self.y_test[sidx]]))[0]
+			predicted_projects = self.mlb.inverse_transform(np.array([y_pred[idx]]))[0]
+
+			results.append({
+				"text": self.X_test_text[sidx],
+				"actual": actual_projects,
+				"predicted": predicted_projects
+			})
+
+		return results
+	
+	def optimize_thresholds(self, step=0.05):
+		if not self.initialized:
+			raise RuntimeError("Model is not initialized")
+
+		y_pred_probs = self.model.predict(self.X_test, verbose=0)
+		num_classes = len(self.mlb.classes_)
+		
+		self.optimized_thresholds = np.full(num_classes, 0.5)
+		threshold_list = np.arange(0.05, 0.96, step)
+
+		for c in range(num_classes):
+			y_true_class = self.y_test[:, c]
+			y_prob_class = y_pred_probs[:, c]
+
+			best_f1 = -1
+			best_threshold = 0.5
+
+			for t in threshold_list:
+				y_pred_class = (y_prob_class >= t).astype(int)
+				score = fbeta_score(y_true_class, y_pred_class, beta=0.35, zero_division=0)
+
+				if score > best_f1:
+					best_f1 = score
+					best_threshold = t
+				
+			self.optimized_thresholds[c] = best_threshold
+
+		return self.optimized_thresholds
+
 	def save(self, name):
 		if not self.initialized:
 			raise RuntimeError("Model is not initialized")
@@ -126,7 +188,7 @@ class Model():
 		self.model.save(f"../model/{name}/wiki_model.keras")
 		joblib.dump(self.vectorizer, f"../model/{name}/tfidf_vectorizer.pkl")
 		joblib.dump(self.mlb, f"../model/{name}/mlb_binarizer.pkl")
-		joblib.dump([self.X_test, self.y_test], f"../model/{name}/test_data.pkl")
+		joblib.dump([self.X_test_text, self.X_test, self.y_test], f"../model/{name}/test_data.pkl")
 
 	def load(self, name):
 		if self.initialized:
@@ -135,7 +197,7 @@ class Model():
 		self.model = load_model(f"../model/{name}/wiki_model.keras")
 		self.vectorizer = joblib.load(f"../model/{name}/tfidf_vectorizer.pkl")
 		self.mlb = joblib.load(f"../model/{name}/mlb_binarizer.pkl")
-		self.X_test, self.y_test = joblib.load(f"../model/{name}/test_data.pkl")
+		self.X_test_text, self.X_test, self.y_test = joblib.load(f"../model/{name}/test_data.pkl")
 		self.initialized = True
 
 		return self
@@ -152,6 +214,7 @@ class Model():
 	def predict(self, text, threshold=0.5):
 		probabilities = self.get_probabilities(text)
 
+		threshold = getattr(self, "optimized_thresholds", threshold)
 		predictions = (probabilities >= threshold).astype(int)
 		projects = self.mlb.inverse_transform(np.array([predictions]))[0]
 
