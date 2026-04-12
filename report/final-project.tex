@@ -174,6 +174,29 @@ any test data, to ensure there is no data leakage.
 
 \section{Model Implementation}
 
+We implement our model as a deep feed-forward neural network using Keras's \code{Sequential}
+model. Our goal is to create a ``funnel'' where thousands of input features are mapped using
+hidden layers into much denser semantic predictions. Our input layer varies in size depending
+on the number of features given by the vectorizer. We then choose an arbitrary but reasonable
+value for the size of the first hidden layer: 512. The second hidden layer then continues
+the ``funnel'' with half the number of neurons compared to the first. Finally, the output
+layer matches the number of WikiProjects we are categorizing into.
+
+For both of the dense layers, we use the ReLU activation function as it prevents vanishing
+gradients and allows the network to learn non-linear relationships. The output layer uses the
+Sigmoid activation function, which calculates a probability between 0 and 1 for each node
+(instead of Softmax, which sums all outputs to 1 and is used for multiclass classification).
+We use binary cross-entropy, which uses the following formula, as our cost function:
+
+\begin{equation*}
+	\text{BCE}=-\frac{1}{N}\sum_{i=1}^N (y_1\log(p_i)+(1-y_i)\log(1-p_i))
+\end{equation*}
+
+This function independently calculates the loss for each label, which allows the model to
+predict multiple labels for a single input. It has the effect of heavily punishing confidently
+incorrect predictions. Finally, we use the Adam optimizer, which adjusts the learning rate
+for each parameter and can lead to faster convergence than normal gradient descent. 
+
 \section{Evaluation and Insights}
 
 \subsection{Experiment: Data Volume}
@@ -442,9 +465,56 @@ provide any performance gains.
 
 We will now create an optimized model based on the results of the previous experiments.
 Firstly, our testing with data volume revealed that there is a consistent (although gradual)
-increase in performance
+increase in performance when more data is provided; so, we will not exclude any training
+data for the final model. A dropout rate of 0.3---especially when combined with a smaller
+network size---is likely sufficient to prevent overfitting. To balance model performance
+with training time and memory usage, we will use a maximum of 5,000 features. Finally, we
+will scale down our original layer size by a factor of 4, for 128 and 64 neurons in the first
+and second layers respectively.
+
+When initially evaluating this model, we find that its average performance metrics across
+all samples are 0.948 for precision, 0.718 for recall, and 0.807 for $F_1$. However, this
+varies widely between projects: \textit{Biography} has 0.978/0.916/0.946, whereas \textit{Geography},
+which is lowest among all projects, has only\\ 0.879/0.323/0.473. The difference between
+these two projects can be explained fairly easily: biography articles are typically in
+the format \code{[name] ([birth] - [death]) is/was a [nationality] [occupation]}. This
+makes them much easier for the model to identify. Geography articles tend to be much more
+diverse, and the \textit{WikiProject Geography} tag tends to be applied to articles
+inconsistently.
+
+A surprising result was that of \textit{WikiProject United States}: its performance was
+only slightly better than that of Geography. To investigate this, a \code{wrong_where}
+method was added to the Model class. This function returns articles from the dataset which
+were misclassified by the model. After examination, the cause of this appears to again be
+inconsistent tagging in the training dataset: there are often articles about an American
+topic, with ``American'' in the lead sentence, that are \textit{not} tagged as part of
+the United States project. This results in the model often being unconfident and conservative
+for articles in this topic area.
+
+We will make a modification to how labels are assigned. Up until now, the model generated
+probabilities for each project, which are then ``predicted'' if above a certain threshold
+(usually 0.5). Increasing this threshold generally increases precision and decreases recall,
+and vice versa. We implement a function \code{optimize_thresholds} which, for each class,
+determines a custom threshold to maximize its performance metrics.
+
+The $F_1$ score, which considers both precision and recall equally, is a good metric for
+measuring a model's overall performance. However, for our application precision is more
+important: while not assigning WikiProjects to an article isn't a big deal (better
+something than nothing), assigning \textit{incorrect} projects is disruptive (an editor
+will need to manually fix the mistake). Therefore we will instead use the $F_\beta$ score,
+which allows us to set $\beta$ depending on which metric we value more. We use $\beta=0.5$,
+which strongly favours precision.
+
+Overall, our model is extremely capable and accurate. It labels articles correctly in the
+majority of cases, and when it mislabels it is almost always due to the model's intentional
+conservative design, or flaws in the dataset itself, as opposed to being wrong. If expanded
+to label more than the 25 largest projects, this model could almost certainly be used in
+production on Wikipedia.
 
 \section{Conclusion}
+
+In this project, we successfully developed a deep feed-forward neural network to help
+volunteers address the significant backlog of unreviewed Wikipedia articles. 
 
 \subsection{Next Steps}
 
@@ -477,6 +547,7 @@ class is in a Python file. The description for each file is as follows:
 	\text{Model} class to create and train a model with the given parameters. It does this on
 	a separate thread, to ensure memory is reclaimed once it is done. It then runs the model's
 	\code{get_report} function, and returns statistics.
+	\item \code{final_model.ipynb} contains our optimized model and code to evaluate it.
 \end{itemize}
 
 \section{References}

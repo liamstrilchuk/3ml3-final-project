@@ -141,7 +141,7 @@ class Model():
 		results = []
 		for sidx in wrong_indices:
 			actual_projects = self.mlb.inverse_transform(np.array([self.y_test[sidx]]))[0]
-			predicted_projects = self.mlb.inverse_transform(np.array([y_pred[idx]]))[0]
+			predicted_projects = self.mlb.inverse_transform(np.array([y_pred[sidx]]))[0]
 
 			results.append({
 				"text": self.X_test_text[sidx],
@@ -151,7 +151,7 @@ class Model():
 
 		return results
 	
-	def optimize_thresholds(self, step=0.05):
+	def optimize_thresholds(self, beta=0.6, step=0.05):
 		if not self.initialized:
 			raise RuntimeError("Model is not initialized")
 
@@ -170,7 +170,7 @@ class Model():
 
 			for t in threshold_list:
 				y_pred_class = (y_prob_class >= t).astype(int)
-				score = fbeta_score(y_true_class, y_pred_class, beta=0.35, zero_division=0)
+				score = fbeta_score(y_true_class, y_pred_class, beta=beta, zero_division=0)
 
 				if score > best_f1:
 					best_f1 = score
