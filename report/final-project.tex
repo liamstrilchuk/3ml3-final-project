@@ -170,7 +170,9 @@ This has a number of parameters to improve the algorithm's accuracy and performa
 \end{itemize}
 
 Importantly, when fitting the vectorizer to the data, we use only the training data, and not
-any test data, to ensure there is no data leakage.
+any test data, to ensure there is no data leakage. To begin with, we will set the vectorizer
+to have a maximum of 10,000 parameters and an ngram range of $(1, 2)$ to capture some
+semantic context.
 
 \section{Model Implementation}
 
@@ -514,16 +516,48 @@ production on Wikipedia.
 \section{Conclusion}
 
 In this project, we successfully developed a deep feed-forward neural network to help
-volunteers address the significant backlog of unreviewed Wikipedia articles. 
+volunteers address the significant backlog of unreviewed Wikipedia articles. By using TF-IDF
+vectorization on article leads, the model effectively automates the multi-label classification
+of new articles into relevant WikiProjects, working as a proof-of-concept to assist reviewers.
+
+Through experimentation, we discovered several insights into model optimization. Firstly, we
+discovered that only a fraction of the available dataset is needed to make an accurate model;
+however, there was a consistent (albeit small) increase in performance with additional data.
+Our experiments with dropout and network size revealed that the initial network had a
+significant amount of excess capacity, allowing us to significantly reduce network layer sizes
+without impacting performance. Finally, we found that only around 5,000 features are needed
+to classify articles effectively. Together, these insights allowed us to decrease the network's
+trainable parameter count by a factor of 8 while keeping virtually all performance.
+
+After creating our final model, we investigated project-specific misclassifications, such as
+the model's inaccuracy for the \textit{Geography} project. This revealed that inconsistent
+human tagging in the training dataset was actively hindering the model. Because assigning
+incorrect projects is disruptive and creates manual work for editors, we implemented a custom
+metric to heavily prioritize precision over recall.
 
 \subsection{Next Steps}
 
+Moving forward, there a number of steps that could be taken to improve the model's performance,
+robustness, and scalability.
+
 \begin{itemize}
-	\item Partial random under-sampling\footnote
+	\item While the simple technique of random undersampling was effective for the scope of
+	our model, when scaling up the model to thousands of projects, many of which have only
+	a few dozen articles, more advanced techniques may be needed. These could include partial
+	random undersampling, which can use nearest neighbour heuristics to only remove irrelevant
+	examples of majority classes, while keeping those closest to decision boundaries. This
+	ensures that large class imbalances can be handled, while not removing valuable data.\footnote
 	{Nicolás García-Pedrajas, ``Partial random under/oversampling for multilabel problems''}
-	\item Pretrained models or word embeddings
-	\item Categories instead of projects
+	\item To capture deeper semantic context, the relatively simple TF-IDF vectorizer could be
+	replaced with pretrained word embeddings or transformer models, which would likely help
+	with broad and inconsistently tagged topic areas like Geography.
+	\item In addition to WikiProjects, Wikipedia articles are classified into more specific
+	categories (eg. \textit{20th-century Canadian politicians}). This would require a much more
+	complex model, and likely a different architecture entirely: while there are thousands
+	of projects, there are millions of categories, with more created every day.
 \end{itemize}
+
+\newpage
 
 \section{Code Organization}
 
@@ -551,5 +585,14 @@ class is in a Python file. The description for each file is as follows:
 \end{itemize}
 
 \section{References}
+
+García-Pedrajas, N. (2024). Partial random under/oversampling for multilabel problems.
+Knowledge-Based Systems, 299, 112355. https://doi.org/10.1016/j.knosys.2024.112355
+\newline
+
+\noindent
+Olawale Awe, O. (2024). Computational strategies for handling imbalanced data in machine
+learning [Lecture notes/PowerPoint slides]. International Statistical Institute.
+https://isi-web.org/webinar/iasc-computational-strategies-tackling-imbalanced-data-machine-learning
 
 \end{document}
