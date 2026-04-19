@@ -1,5 +1,7 @@
 from model import Model
 
+# this function needs to be in a py file to create as a thread
+# create, train, and run model, and return its characteristics
 def evaluate_model(create_params={}, train_params={}):
 	model = Model()
 	model.create(**create_params)
