@@ -62,7 +62,7 @@ is different from multi-class classification, since an article can be part of ze
 more WikiProjects. Since there are thousands of projects of varying size (for example,
 \textit{Computing} has 36,000 articles; \textit{Artificial intelligence} has 1,600; and
 \textit{Human-computer interaction} has only 184), we will focus on classifying only the
-approximately 100 largest projects as a proof-of-concept. However, we will explore next
+approximately 25 largest projects as a proof-of-concept. However, we will explore next
 steps for a full model in the conclusion.
 
 We will use Tensorflow/Keras to build and train the model, along with \code{scikit-learn}
@@ -174,6 +174,11 @@ any test data, to ensure there is no data leakage. To begin with, we will set th
 to have a maximum of 10,000 parameters and an ngram range of $(1, 2)$ to capture some
 semantic context.
 
+We also have to convert our list of WikiProjects for each article into something the model can
+understand: for this, we use \code{scikit-learn}'s \code{MultiLabelBinarizer}. This takes a
+list of strings (eg. \code{["WikiProject ABC", "WikiProject DEF"]}) and converts it into a
+multi-hot encoded vector (\code{[1, 0, ..., 1]}).
+
 \section{Model Implementation}
 
 We implement our model as a deep feed-forward neural network using Keras's \code{Sequential}
@@ -199,7 +204,28 @@ predict multiple labels for a single input. It has the effect of heavily punishi
 incorrect predictions. Finally, we use the Adam optimizer, which adjusts the learning rate
 for each parameter and can lead to faster convergence than normal gradient descent. 
 
+To prevent overfitting, we use Dropout regularization layers following each of the Dense layers.
+This randomly ``turns off'' neurons with a specified frequency, forcing the model to learn
+patterns instead of memorizing training data. We initally set the dropout probability to 0.3,
+though we will experiment with different dropout rates in Section 5.2 below.
+
+For training the model, we split the dataset into a training set (with 80\% of the data) and
+a testing set (20\%). When training using \code{model.fit}, 10\% of the training data is used
+for validation, alongside Keras's \code{EarlyStopping} callback. This callback monitors the
+validation loss; once this increases and begins to diverge from the training loss, we know that
+the model has begun to overfit and we stop training. The parameters we use for this are
+\code{patience=2} (so \code{val_loss} needs to increase over two consecutive epochs before
+stopping) and \code{restore_best_weights=True}, which ensures we use the weights from the epoch
+with the lowest loss, instead of the final, slightly overfitted weights.
+
+\newpage
+
 \section{Evaluation and Insights}
+
+In this section, we run a number of experiments with the goal of determining the optimal
+hyperparameters for our model. Creating a larger or more ``powerful'' model comes at the cost
+of additional resource consumption (eg. more memory or computing time) while in many cases
+not improving performance.
 
 \subsection{Experiment: Data Volume}
 
@@ -266,6 +292,8 @@ significantly when more data is used. For example, when all available data was u
 a model, the training time was roughly 3x that of a model using only 30\%; however, the
 improvement in accuracy was only 2\%. Thus it may not be worth it to always use the
 largest possible dataset.
+
+\newpage
 
 \subsection{Experiment: Dropout}
 
@@ -345,6 +373,8 @@ of dropout fails to prevent overfitting, this suggests that the model possesses 
 capacity, and reducing the size of the network's layers may be more effective at preventing
 overfitting.
 
+\newpage
+
 \subsection{Experiment: Max Features}
 
 The \code{max_features} parameter of the \code{TfidfVectorizer} class was discussed in
@@ -405,6 +435,12 @@ number of topics, can be categorized using a relatively small vocabulary: the wo
 or ``Canadian'' can tell us, for example, that an article should be put into the ``Albums''
 or ``Canada'' WikiProjects respectively, without a large amount of other context needed.
 
+Modifying the maximum number of features comes with a significant increase in the number of
+trainable parameters in the model, and therefore can increase its training time. For example,
+increasing the feature space from 100 features to 10,000 results in a 700\% jump in training time.
+
+\newpage
+
 \subsection{Experiment: Model Size}
 
 Finally, we will run an experiment comparing models with different sizes of hidden layers.
@@ -438,19 +474,19 @@ by a factor of 8 to 128 and 64, this lowers to only 8,192.
             mark=none
         ]
         table [x=factor, y=precision, col sep=comma] {experiment_model_size.csv};
-        \addlegendentry{precision}
+        \addlegendentry{Precision}
         \addplot[
             color=red,
             mark=none
         ]
         table [x=factor, y=recall, col sep=comma] {experiment_model_size.csv};
-        \addlegendentry{recall}
+        \addlegendentry{Recall}
         \addplot[
             color=green!70!black,
             mark=none
         ]
         table [x=factor, y=f1-score, col sep=comma] {experiment_model_size.csv};
-        \addlegendentry{f1-score}
+        \addlegendentry{F1-Score}
         \end{axis}
     \end{tikzpicture}
     \caption{Performance metrics evaluated across different model size factors.}
@@ -556,8 +592,6 @@ robustness, and scalability.
 	complex model, and likely a different architecture entirely: while there are thousands
 	of projects, there are millions of categories, with more created every day.
 \end{itemize}
-
-\newpage
 
 \section{Code Organization}
 
